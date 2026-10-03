@@ -265,13 +265,39 @@ def test_top_recruits_are_the_regions_five_best_with_their_top_lean():
     block = sp.top_recruits(docs, region="B", user_team_id=USER, team_name_map={"t9": "Team 9", USER: "My Team"})
     assert block["region"] == "B"
     assert [row["name"] for row in block["rows"]] == ["No Lean", "Recruit 7", "Recruit 6", "Recruit 5", "Recruit 4"]
-    assert block["rows"][0] == {"recruit_id": "nolean", "name": "No Lean", "position": "SF", "rt": 60,
+    assert block["rows"][0] == {"recruit_id": "nolean", "name": "No Lean", "position": "SF", "rt": 60, "year": None,
                                 "lean_team_id": None, "lean_team_name": None, "lean_is_user": False}
     assert block["rows"][1]["lean_team_name"] == "My Team" and block["rows"][1]["lean_is_user"] is True
     assert block["rows"][2]["lean_team_name"] == "Team 9" and block["rows"][2]["lean_is_user"] is False
     assert no_hidden_keys(block) == []
     assert sp.top_recruits(docs, region="", user_team_id=USER, team_name_map={}) is None
     assert sp.top_recruits([], region="B", user_team_id=USER, team_name_map={}) == {"region": "B", "rows": []}
+
+
+def test_the_watchlist_side_is_the_coachs_five_best_from_any_region():
+    docs = [recruit(f"r{i}", f"Recruit {i}", 40 + i, "B", lean="t9") for i in range(8)]
+    docs += [recruit("far", "Other Region", 99, "C", lean=USER), recruit("far2", "Far Two", 30, "D")]
+    docs[3]["year"] = "Senior"
+    names = {"t9": "Team 9", USER: "My Team"}
+    watched = ["r1", "far", "r3", "far2", "r7", "r5", "gone"]  # six on file, one no longer a recruit
+    block = sp.top_recruits(docs, region="B", user_team_id=USER, team_name_map=names, watchlist=watched)
+    # The region list is untouched by the watchlist.
+    assert [row["name"] for row in block["rows"]] == [f"Recruit {i}" for i in (7, 6, 5, 4, 3)]
+    # Watchlist: any region, RT order, five rows; the count is everyone watched who is still a recruit.
+    assert block["watchlist"]["count"] == 6
+    assert [row["recruit_id"] for row in block["watchlist"]["rows"]] == ["far", "r7", "r5", "r3", "r1"]
+    far = block["watchlist"]["rows"][0]
+    assert far["lean_team_name"] == "My Team" and far["lean_is_user"] is True
+    assert block["watchlist"]["rows"][3]["year"] == "SR"
+    assert no_hidden_keys(block) == []
+    # An empty watchlist is an empty list, not a missing block; no watchlist argument, no block.
+    empty = sp.top_recruits(docs, region="B", user_team_id=USER, team_name_map=names, watchlist=[])
+    assert empty["watchlist"] == {"count": 0, "rows": []}
+    assert "watchlist" not in sp.top_recruits(docs, region="B", user_team_id=USER, team_name_map=names)
+    # Nothing about how a recruit is scored travels with either list.
+    allowed = {"recruit_id", "name", "position", "rt", "year", "lean_team_id", "lean_team_name", "lean_is_user"}
+    for row in block["rows"] + block["watchlist"]["rows"]:
+        assert set(row) == allowed
 
 
 # --- the digest --------------------------------------------------------------------------------

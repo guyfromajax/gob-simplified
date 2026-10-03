@@ -89,7 +89,7 @@ test.describe('office weekly card sfx', () => {
 
     const snap = page.locator('.office-snap');
     await expect(snap).toBeVisible();
-    await expect(snap).toContainText('Moved most');
+    await expect(snap).toContainText('Team Attributes Moved Most');
     await expect(snap).toContainText('Offense');
     await expect(snap).not.toContainText('Shooting');
     await expect(snap).not.toContainText('Momentum');

@@ -201,3 +201,24 @@ def test_reader_normalizes_junk():
     assert fr._recruiting_watchlist(
         {fr.RECRUITING_WATCHLIST_FIELD: ["a", "", None, " b ", "a"]}
     ) == ["a", "b"]
+
+
+def test_the_recruit_check_uses_only_what_both_stores_accept(wired, monkeypatch):
+    """The SQLite collection's count_documents takes the filter and nothing else.
+
+    A ``limit=`` keyword made every watch-star click a 500 on the desktop build, so the
+    Office's Watchlist could never be filled there.
+    """
+    from BackEnd.persistence.sqlite_collection import SqliteCollection
+    import inspect
+
+    assert list(inspect.signature(SqliteCollection.count_documents).parameters) == ["self", "filter"]
+
+    class _FilterOnly:
+        def count_documents(self, filter=None):
+            return 1 if (filter or {}).get("recruit_id") == "r-1" else 0
+
+    wired({"recruiting_watchlist": []})
+    monkeypatch.setattr(fr, "franchise_recruits_data_collection", _FilterOnly())
+    out = _toggle("r-1", True)
+    assert out["watching"] is True and out["watchlist"] == ["r-1"]

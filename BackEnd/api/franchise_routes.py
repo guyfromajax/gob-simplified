@@ -10321,6 +10321,21 @@ def _build_office_digest_for_command_center(
     roster_spots = None
     if week == 35 and franchise_doc.get("_id") is not None and team_id:
         roster_spots = _calculate_available_roster_spots(franchise_doc["_id"], str(team_id))
+        # Signing Day: the Office lists every recruit on the submitted Orders, so each
+        # needs his name, position, rating and year (identity only, no attributes).
+        orders = team_doc.get("_office_signing_orders")
+        order_ids = sorted({
+            str(entry.get("id")) for entry in (orders.values() if isinstance(orders, dict) else [])
+            if isinstance(entry, dict) and entry.get("id")
+        })
+        if order_ids:
+            lookup.update(recruit_lookup_from_docs(
+                list(franchise_recruits_data_collection.find(
+                    {"franchise_id": str(franchise_doc["_id"]), "recruit_id": {"$in": order_ids}},
+                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1, "year": 1},
+                )),
+                str(team_id or ""),
+            ))
     newcomers = None
     if week <= 1:
         walk_ons = franchise_doc.get("pending_walk_on_welcome") or []
@@ -10439,11 +10454,14 @@ def _office_preview_blocks(
             recruits = top_recruits(
                 franchise_recruits_data_collection.find(
                     {"franchise_id": fid},
-                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1, "Home Region": 1},
+                    {"recruit_id": 1, "name": 1, "position": 1, "position_ratings": 1, "Lean": 1,
+                     "Home Region": 1, "year": 1},
                 ),
                 region=region,
                 user_team_id=tid,
                 team_name_map=response.get("team_name_map") if isinstance(response.get("team_name_map"), dict) else {},
+                # The Office's Watchlist side: the coach's own list, from any region.
+                watchlist=_recruiting_watchlist(franchise_doc),
             )
         except Exception:
             logger.exception("[OFFICE] top recruits failed franchise_id=%s", fid)
@@ -19127,8 +19145,10 @@ def toggle_recruiting_watchlist(
     if not recruit_id:
         raise HTTPException(status_code=400, detail="recruit_id is required")
 
+    # No ``limit``: the SQLite store's count_documents takes the filter only, and passing one
+    # made every watch-star click a 500 on desktop. One recruit id matches at most one row.
     valid = franchise_recruits_data_collection.count_documents(
-        {"franchise_id": str(req.franchise_id), "recruit_id": recruit_id}, limit=1
+        {"franchise_id": str(req.franchise_id), "recruit_id": recruit_id}
     )
     if not valid:
         raise HTTPException(status_code=400, detail="Unknown recruit for this franchise")

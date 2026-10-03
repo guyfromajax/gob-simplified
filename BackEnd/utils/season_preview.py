@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any, Iterable, Mapping, Optional
 
+from BackEnd.utils.player_year import format_player_year_display
+
 LAST_SEASON_FIELD = "last_season"
 SECTION_ROWS = 5  # no section runs longer than this
 CIRCLE_GAMES = 3
@@ -354,35 +356,56 @@ def top_recruits(
     region: Any,
     user_team_id: Any,
     team_name_map: Mapping[str, Any] | None,
+    watchlist: Iterable[Any] | None = None,
 ) -> Optional[dict[str, Any]]:
-    """The best-rated recruits from the user's region, each with the team leading for him."""
+    """The best-rated recruits from the user's region, each with the team leading for him.
+
+    With ``watchlist`` (the coach's watched recruit ids) the block also carries
+    ``watchlist``: the five best-rated of those, from any region, and how many are watched.
+    Both lists are ordered by RT and say nothing about how a recruit is scored.
+    """
     letter = str(region or "").strip().upper()
     if not letter:
         return None
     names = team_name_map or {}
     tid = str(user_team_id or "")
+    watched_ids = None if watchlist is None else {str(rid) for rid in watchlist if rid}
     rows = []
+    watched = []
     for doc in recruit_docs or []:
         if not isinstance(doc, Mapping) or not doc.get("recruit_id"):
             continue
-        if str(doc.get("Home Region") or "").strip().upper() != letter:
+        rid = str(doc.get("recruit_id"))
+        in_region = str(doc.get("Home Region") or "").strip().upper() == letter
+        is_watched = watched_ids is not None and rid in watched_ids
+        if not in_region and not is_watched:
             continue
         pos, rt = _best(doc.get("position_ratings"))
         if rt is None:
             continue
         lean = doc.get("Lean") if isinstance(doc.get("Lean"), Mapping) else {}
         lean_id = str(lean.get("1") or "") or None
-        rows.append({
-            "recruit_id": str(doc.get("recruit_id")),
+        row = {
+            "recruit_id": rid,
             "name": str(doc.get("name") or "").strip() or None,
             "position": pos or (str(doc.get("position") or "").strip() or None),
             "rt": rt,
+            "year": format_player_year_display(doc.get("year")) if doc.get("year") else None,
             "lean_team_id": lean_id,
             "lean_team_name": (str(names.get(lean_id) or "") or None) if lean_id else None,
             "lean_is_user": bool(tid) and lean_id == tid,
-        })
-    rows.sort(key=lambda row: (-row["rt"], str(row["name"] or "")))
-    return {"region": letter, "rows": rows[:SECTION_ROWS]}
+        }
+        if in_region:
+            rows.append(row)
+        if is_watched:
+            watched.append(row)
+    order = lambda row: (-row["rt"], str(row["name"] or ""))  # noqa: E731
+    rows.sort(key=order)
+    block: dict[str, Any] = {"region": letter, "rows": rows[:SECTION_ROWS]}
+    if watched_ids is not None:
+        watched.sort(key=order)
+        block["watchlist"] = {"count": len(watched), "rows": watched[:SECTION_ROWS]}
+    return block
 
 
 def last_season_snapshot(
