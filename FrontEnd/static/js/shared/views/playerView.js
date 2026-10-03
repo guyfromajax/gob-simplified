@@ -5,14 +5,19 @@
 
 import { barHtml, bindPager, bindUp, oneDecimal, query, readPager, stampOrigin, withParams } from './detailBar.js';
 
-var RATE = [
-  ['pts_per_game', 'PTS'],
-  ['reb_per_game', 'REB'],
-  ['ast_per_game', 'AST'],
-  ['fg_pct', 'FG%'],
-  ['tp_pct', '3PT%'],
-  ['ft_pct', 'FT%'],
-  ['def_pct', 'DEF%']
+// The hero's season line, in two stacked rows: counting stats over percentages.
+var RATE_ROWS = [
+  [
+    ['pts_per_game', 'PTS'],
+    ['reb_per_game', 'REB'],
+    ['ast_per_game', 'AST']
+  ],
+  [
+    ['fg_pct', 'FG%'],
+    ['tp_pct', '3PT%'],
+    ['ft_pct', 'FT%'],
+    ['def_pct', 'DEF%']
+  ]
 ];
 
 var LINE = [
@@ -191,9 +196,13 @@ export function mount(container, ctx) {
       + '<span>Rating · current → potential</span></div></div>'
       + '<div class="gob-hero-stats"><span class="gob-eyebrow">'
       + tables.esc((season.gp == null ? '—' : String(season.gp)) + ' GP')
-      + '</span><div class="gob-hs">';
-    RATE.forEach(function (pair) {
-      html += '<div><b>' + tables.esc(oneDecimal(season[pair[0]])) + '</b><span>' + pair[1] + '</span></div>';
+      + '</span><div class="gob-hs-rows">';
+    RATE_ROWS.forEach(function (row) {
+      html += '<div class="gob-hs">';
+      row.forEach(function (pair) {
+        html += '<div><b>' + tables.esc(oneDecimal(season[pair[0]])) + '</b><span>' + pair[1] + '</span></div>';
+      });
+      html += '</div>';
     });
     html += '</div></div></section><div class="gob-dt-body"><section class="gob-tcard"><div class="card-h"><h3>Attributes</h3></div><div class="gob-apan">';
     (body.attributes || []).forEach(function (group) {

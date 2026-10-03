@@ -124,6 +124,7 @@ async function installApi(page, state) {
     }
     if (path === '/franchise/complete-week/phase-b' && method === 'POST') {
       // The week really advances: 25 -> 26, training not yet run, invites not sent.
+      if (state.phaseBDelayMs) await new Promise((r) => setTimeout(r, state.phaseBDelayMs));
       state.week += 1;
       state.trainingCompleted = false;
       return fulfillJson(route, { status: 'ok', phase: 'b', week: state.week - 1, idempotent: false });
@@ -144,6 +145,39 @@ async function installApi(page, state) {
  * is watched: enabled, and the top element at its centre (not under an overlay).
  * sessionStorage survives the bfcache restore and the replace, so nothing is lost.
  */
+/**
+ * Every document records what the full-page loader shows on each frame once the
+ * watch is armed: '-' no loader, 'S' the spinning basketball, 'P' the old team-banner
+ * pulse. Consecutive repeats collapse, so the list is the sequence the player saw.
+ */
+async function installLoaderSampler(page) {
+  await page.addInitScript(() => {
+    const shown = (el) => !!el && getComputedStyle(el).display !== 'none';
+    const sample = () => {
+      try {
+        if (sessionStorage.getItem('e2e-watch-loader') === '1' && document.readyState !== 'loading') {
+          const overlay = document.getElementById('page-load-overlay');
+          const up = shown(overlay);
+          let code = '-';
+          if (up) {
+            code = shown(overlay.querySelector('.page-load-overlay-pulse')) ? 'P'
+              : (shown(overlay.querySelector('img:not(.page-load-overlay-pulse-image)')) ? 'S' : '?');
+          }
+          const page = /court\.html$/.test(location.pathname) ? 'court' : (/franchise-command-center\.html$/.test(location.pathname) ? 'office' : 'other');
+          const row = page + ':' + code;
+          const seen = JSON.parse(sessionStorage.getItem('e2e-loader-seen') || '[]');
+          if (seen[seen.length - 1] !== row) {
+            seen.push(row);
+            sessionStorage.setItem('e2e-loader-seen', JSON.stringify(seen));
+          }
+        }
+      } catch (e) { /* sampling only */ }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+}
+
 async function installAdvanceSampler(page) {
   await page.addInitScript(() => {
     if (!/franchise-command-center\.html$/.test(location.pathname)) return;
@@ -260,6 +294,50 @@ test('after a game in an invite week, the FCC shows the new week and the invite 
   await enterFcc(page);
   await simGameToLockerRoom(page);
   await expectFreshWeek26(page);
+});
+
+test('after a game there is one loader: the spinner, from the locker-room click until the Office is drawn', async ({ page }) => {
+  test.setTimeout(150000);
+  // The computer games take a moment, so the wait on the court is long enough to see.
+  const state = { week: 25, startWeek: 25, trainingCompleted: true, boardSavedWeek: 25, failFccReads: 0, phaseBDelayMs: 1200 };
+  // V3_SHOTS=1 writes reports/v3-pages/after-loader-<width>.png: the one loader, mid-wait.
+  const shots = process.env.V3_SHOTS === '1';
+  const width = Number(process.env.V3_LOADER_WIDTH) === 1920 ? 1920 : 1280;
+  if (shots) {
+    state.phaseBDelayMs = 3000;
+    await page.setViewportSize({ width, height: width === 1920 ? 1080 : 720 });
+  }
+  await installLoaderSampler(page);
+  await installApi(page, state);
+  await enterFcc(page);
+  let shot = null;
+  await simGameToLockerRoom(page, async () => {
+    await page.evaluate(() => {
+      sessionStorage.setItem('e2e-watch-loader', '1');
+      sessionStorage.removeItem('e2e-loader-seen');
+    });
+    await page.waitForTimeout(100);
+    if (shots) {
+      shot = page.waitForFunction(() => {
+        const overlay = document.getElementById('page-load-overlay');
+        return /court\.html$/.test(location.pathname) && overlay && getComputedStyle(overlay).display !== 'none';
+      }, null, { timeout: 60000 }).then(async () => {
+        const out = require('path').join(__dirname, '../../reports/v3-pages');
+        require('fs').mkdirSync(out, { recursive: true });
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: require('path').join(out, 'after-loader-' + width + '.png') });
+      });
+    }
+  });
+  if (shot) await shot;
+  await expectFreshWeek26(page);
+  const seen = await page.evaluate(() => JSON.parse(sessionStorage.getItem('e2e-loader-seen') || '[]'));
+  const text = seen.join(' ');
+  // The team-banner pulse never shows, and no page is seen between the two documents:
+  // the spinner on the court hands over to the spinner on the Office, which then lifts.
+  expect(text, text).not.toContain(':P');
+  expect(text, text).not.toContain(':?');
+  expect(seen, text).toEqual(['court:-', 'court:S', 'office:S', 'office:-']);
 });
 
 test('review invites, Play Next Game from the recruiting page, return: fresh week', async ({ page }) => {

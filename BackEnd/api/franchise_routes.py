@@ -16284,10 +16284,40 @@ def get_practice_squad_team(
 
     projected_starting_five = build_enriched_projected_starting_five(players, season_map)
 
+    # The standard team page (team-view) reads the squad in the shapes it already knows:
+    # roster rows (rt, position) and season lines (per_game / totals / rates).
+    from BackEnd.practice_squad.browse import team_page
+    from BackEnd.practice_squad.constants import PS_CHAMPIONSHIP_WEEK, PS_TOURNAMENT_WEEKS
+    from BackEnd.practice_squad.manager import _completed_games_for_week
+    from BackEnd.utils.leaders_snapshot import _best_position, _ratings_dict
+    from BackEnd.utils.t3_detail import _highest_rt, season_bases
+
+    # The projected five are the page's Starters, in slot order; the rest are the Bench.
+    starter_order = {
+        str(five.get("player_id") or ""): index
+        for index, five in enumerate(projected_starting_five or [])
+    }
+    for row in players:
+        ratings = _ratings_dict(row.get("position_ratings"))
+        bases = season_bases(row.get("stats") or {})
+        row["starter"] = str(row.get("player_id") or "") in starter_order
+        row["lineup_order"] = starter_order.get(str(row.get("player_id") or ""))
+        row["rt"] = _highest_rt(ratings)
+        row["position"] = _best_position(ratings)
+        row["per_game"] = bases["per_game"]
+        row["totals"] = bases["totals"]
+        row["rates"] = bases["rates"]
+
+    tournament_games = []
+    for ps_week in (*PS_TOURNAMENT_WEEKS, PS_CHAMPIONSHIP_WEEK):
+        for game in _completed_games_for_week(ps, ps_week):
+            tournament_games.append({**game, "week": ps_week})
+
     return {
         "team": team,
         "players": players,
         "projected_starting_five": projected_starting_five,
+        "page": team_page(ps, ps_team_id, tournament_games),
     }
 
 

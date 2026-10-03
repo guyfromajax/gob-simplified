@@ -174,6 +174,11 @@ async function install(page, state) {
           stats: {},
         }],
         projected_starting_five: [],
+        page: {
+          team_id: url.searchParams.get('ps_team_id'), name: 'Region C All-Americans', practice_squad: true,
+          tier: 1, tier_label: 'All-Americans', region: 'C', record: { wins: 6, losses: 2 }, tier_place: '3rd of 8',
+          results: [], upcoming: [], next_game: null,
+        },
       });
       return;
     }
@@ -198,7 +203,8 @@ test('practice squad view: before init, in season, and the bracket', async ({ pa
   const errors = [];
   page.on('pageerror', (err) => errors.push(String(err)));
   page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text());
+    // The stub player has no portrait file; the roster falls back to initials.
+    if (msg.type() === 'error' && !/\/images\/players\//.test((msg.location() || {}).url || '')) errors.push(msg.text());
   });
 
   for (const size of [[1280, 720, '1280'], [1920, 1080, '1920']]) {
@@ -282,11 +288,13 @@ test('practice squad view: before init, in season, and the bracket', async ({ pa
   await page.setViewportSize({ width: 1280, height: 720 });
   await openPs(page, { week: 8, initialized: true, currentWeek: 8 });
   await page.locator('#practice-squad-view tr.me a').first().click();
-  await expect(page).toHaveURL(/team-roster-view\.html/);
-  await expect(page).toHaveURL(/mode=practice_squad/);
+  // A squad opens on the standard team page, in the shell.
+  await expect(page).toHaveURL(/franchise-command-center\.html/);
+  await expect(page).toHaveURL(/tab=team-view/);
   await expect(page).toHaveURL(/ps_team_id=ps_C_/);
-  await expect(page).not.toHaveURL(/tab=roster-view/);
-  await expect(page.locator('body')).toContainText('Casey Lane');
+  await expect(page).not.toHaveURL(/team-roster-view|mode=practice_squad|tab=roster-view/);
+  await expect(page.locator('#team-view .gob-hero-n')).toHaveText('Region C All-Americans');
+  await expect(page.locator('#team-view')).toContainText('Casey Lane');
   await page.screenshot({ path: path.join(OUT, 'ps-team-1280.png') });
 
   expect(errors, errors.join('\n')).toEqual([]);

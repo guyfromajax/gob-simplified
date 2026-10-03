@@ -124,13 +124,6 @@ function cloneParams(params) {
     return d == null ? 0 : d;
   }
 
-  function formatNames(names) {
-    if (!names.length) return '';
-    if (names.length === 1) return names[0];
-    if (names.length === 2) return names[0] + ' and ' + names[1];
-    return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
-  }
-
   function getBestPosition(positionRatings) {
     var bestPos = '--';
     var bestRating = null;
@@ -293,14 +286,9 @@ function cloneParams(params) {
 
   function submitCuts() {
     if (selectedIds.size !== cutCount) return;
-    var namesInOrder = players.filter(function (player) {
-      return selectedIds.has(player._id);
-    }).map(function (player) {
-      return player.name;
-    });
+    // Title and the two buttons only: the picks are on the page behind the dialog.
     showModal({
       title: 'Confirm Practice Squad',
-      message: 'You are going to assign ' + formatNames(namesInOrder) + ' to the practice squad. They will be ineligible to play this season, but available for training camp next season. Proceed?',
       accent: 'neutral',
       actions: [
         { label: 'Cancel', variant: 'gob-modal-btn-secondary' },

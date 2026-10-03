@@ -96,7 +96,7 @@
 |---|---|
 | Standings + schedule accordion | `/practice-squad-standings.html` |
 | Tournament brackets | `/practice-squad-bracket.html` |
-| PS team roster + player stats | `/team-roster-view.html?mode=practice_squad&ps_team_id=…` (includes **Starting 5** cards from `projected_starting_five` on `/franchise/practice-squad/team`) |
+| PS team page (roster, stats, schedule) | The standard team page: `franchise-command-center.html?tab=team-view&ps_team_id=…` (`teamView.js`), from `/franchise/practice-squad/team` (`page` block from `practice_squad.browse.team_page`; the projected five are its Starters). The old `/team-roster-view.html?mode=practice_squad&ps_team_id=…` link redirects there. Rules: UX_System, "A practice squad uses the same team page". |
 | Box score | `/box-score.html?mode=practice_squad&game_id=…` |
 | FCC Recruits tab link | **Practice Squad Season** → standings |
 

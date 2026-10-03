@@ -946,6 +946,13 @@ html.gob-shell #team-view {
 .gob-hs div { display: flex; flex-direction: column; gap: 2px; }
 .gob-hs b { font: var(--fw-bold) var(--fs-22)/1 var(--font-display); color: var(--text-100); white-space: nowrap; }
 .gob-hs span { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-60); }
+/* Player hero: two stacked rows that never wrap, on one column grid so the rows line up. */
+.gob-hs-rows { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+.gob-hs-rows .gob-hs { display: grid; grid-template-columns: repeat(4, 52px); gap: 0 14px; }
+/* Player page cards: the content sits inside the card, clear of its border. */
+#player-view .gob-dt-body > .gob-tcard:not(.gob-span),
+#player-view .gob-dt-side > .gob-tcard { padding: var(--space-12) var(--space-16) var(--space-16); }
+#player-view .gob-tcard.gob-span > .card-h { padding: var(--space-12) var(--space-16) 0; }
 .gob-dt-body {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
@@ -1386,12 +1393,13 @@ html.gob-shell.gob-1920 #league-schedule-view .gob-gf { min-height: var(--dsz-28
 @media (max-width: 1099px) {
   #team-schedule-view .gob-schcols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* The score is never clipped: the result column takes the width of its widest score and
+   the team column takes what is left, so a long name gives way (ellipsis), not the score. */
 #team-schedule-view .gob-schwk {
-  table-layout: fixed;
+  table-layout: auto;
 }
-#team-schedule-view .gob-schwk col.c-wk { width: calc(var(--dsz-30) + var(--dsp-8)); }
-#team-schedule-view .gob-schwk col.c-site { width: calc(var(--dsz-20) + var(--dsp-4)); }
-#team-schedule-view .gob-schwk col.c-res { width: calc(var(--dsz-64) + var(--dsp-8)); }
+#team-schedule-view .gob-schwk td.wk { box-sizing: border-box; min-width: calc(var(--dsz-30) + var(--dsp-8)); }
+#team-schedule-view .gob-schwk td.site { box-sizing: border-box; min-width: calc(var(--dsz-20) + var(--dsp-4)); }
 #team-schedule-view .gob-schwk thead th {
   height: var(--dsz-28);
   padding: 0 var(--dsp-10);
@@ -1424,12 +1432,16 @@ html.gob-shell.gob-1920 #league-schedule-view .gob-gf { min-height: var(--dsz-28
   color: var(--text-60);
 }
 #team-schedule-view .gob-schwk td.team {
+  width: 100%;
+  max-width: 0;
   overflow: hidden;
   text-align: left;
 }
 #team-schedule-view .gob-schwk td.res {
-  padding-right: var(--dsp-6);
+  width: 1px;
+  padding-right: var(--dsp-10);
   text-align: right;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 #team-schedule-view .gob-schwk .gob-team {

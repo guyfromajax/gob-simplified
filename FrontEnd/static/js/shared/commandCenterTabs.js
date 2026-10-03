@@ -22,7 +22,7 @@ function cloneParams(params) {
 // Keys that address one drill-in (a team, a player, a news story) or say where it was
 // opened from. They belong to that one entry. Moving to another tab or section drops
 // them, so a story or a team from earlier cannot ride along and steer a later Back.
-var NAV_KEYS = ['story', 'player_id', 'view_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
+var NAV_KEYS = ['story', 'player_id', 'view_team_id', 'ps_team_id', 'roster_team_id', 'team_name', 'pager', 'up',
   'return_url', 'origin', 'return_tab', 'id'];
 
 function dropNavKeys(bag) {
