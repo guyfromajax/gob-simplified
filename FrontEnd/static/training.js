@@ -1923,6 +1923,7 @@ async function initializeTrainingPoints() {
       if (response.ok) {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
+        adoptSavedPlaybookChoice(data.training_playbook_choice);
         currentWeek = Number(data.week || 1);
         currentSeason = Number(data.season || 1);
         currentTeamName = data.user_team_name || currentTeamName || '';
@@ -2004,6 +2005,42 @@ _onPageShow = (event) => {
 window.addEventListener('pageshow', _onPageShow);
 }
 
+/**
+ * The Training playbook choice is a saved setting (Jamie, 2026-10-03): once the user trains
+ * a Custom Playbook it stays the default for every later training, camp and next season
+ * included, until they switch back to Current Playbooks. The server keeps it on the
+ * franchise; this page's working copy is the two sessionStorage keys the Custom Playbook
+ * page writes, which a submit clears. A saved custom choice refills them on every load.
+ */
+function adoptSavedPlaybookChoice(choice) {
+  if (!choice || choice.mode !== 'custom' || !choice.focus) return;
+  const offense = Array.isArray(choice.focus.offense) ? choice.focus.offense.map(String) : [];
+  const defense = Array.isArray(choice.focus.defense) ? choice.focus.defense.map(String) : [];
+  if (!offense.length || !defense.length) return;
+  try {
+    sessionStorage.setItem(STORAGE_PLAYBOOK_FOCUS, JSON.stringify({ offense: offense, defense: defense }));
+    sessionStorage.setItem(STORAGE_PLAYBOOK_MODE, 'custom');
+  } catch (_e) {}
+  syncPlaybookModeToggleUi();
+}
+
+/** Save "Current Playbooks" as the choice. keepalive: the request outlives a navigation. */
+function saveCurrentPlaybooksChoice() {
+  const franchiseId = liveParams().get('franchise_id');
+  if (!franchiseId) return Promise.resolve();
+  return fetch(API_CONFIG.buildUrl('/franchise/training-playbook-choice'), {
+    method: 'PATCH',
+    keepalive: true,
+    headers: Object.assign(
+      { 'Content-Type': 'application/json' },
+      (typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {})
+    ),
+    body: JSON.stringify({ franchise_id: franchiseId, mode: 'current-playbooks' })
+  }).catch(function (error) {
+    console.warn('⚠️ [TRAINING] Could not save the playbook choice:', error);
+  });
+}
+
 function syncPlaybookModeToggleUi() {
   try {
     if (
@@ -2047,6 +2084,7 @@ function wireCustomTrainingPlaybook() {
         sessionStorage.removeItem(STORAGE_PLAYBOOK_MODE);
       } catch (_e) {}
       syncPlaybookModeToggleUi();
+      saveCurrentPlaybooksChoice();
     });
   }
   if (btnCustom) {
@@ -2247,17 +2285,16 @@ function buildDrillTooltipHtml(d) {
   return head + '<div class="tt-desc">' + d.desc + '</div>';
 }
 
-function buildFocusTooltipHtml(value, f) {
-  const archKey = archKeyFromValue(value);
-  const archName = ARCH_NAMES[archKey] || '';
+/* The focus name is the tooltip's title. The archetype it belongs to is not named here
+   (Jamie, 2026-10-03): the option already sits under its archetype heading. */
+function buildFocusTooltipHtml(f) {
   let modes = '';
   if (f.modes) {
     modes = '<ul class="tt-modes">' + f.modes.map(function (m) {
       return '<li class="tt-mode"><b>' + m[0] + '</b> — ' + m[1] + '</li>';
     }).join('') + '</ul>';
   }
-  return '<div class="tt-eyebrow">' + archName + '</div>' +
-    '<div class="tt-name">' + f.name + '</div>' +
+  return '<div class="tt-name">' + f.name + '</div>' +
     '<div class="tt-desc">' + f.desc + '</div>' + modes;
 }
 
@@ -2304,7 +2341,7 @@ function setupTrainingTooltips() {
     if (!radio) return;
     const f = FOCUS_TOOLTIPS[radio.value];
     if (!f) return;
-    registerTrainingTooltip(opt, buildFocusTooltipHtml(radio.value, f), radio);
+    registerTrainingTooltip(opt, buildFocusTooltipHtml(f), radio);
   });
 }
 

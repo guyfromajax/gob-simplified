@@ -3,7 +3,10 @@
 import unittest
 
 from BackEnd.models.training_notes import (
+    READINESS_BANDS,
+    READINESS_UNKNOWN,
     _readiness_label,
+    _readiness_value,
     _offensive_play_selection,
     build_structured_training_report_notes,
 )
@@ -11,12 +14,48 @@ from BackEnd.models.training_notes import (
 
 class TestTrainingNotes(unittest.TestCase):
     def test_readiness_labels(self):
-        self.assertEqual(_readiness_label(12), "Very Strong")
-        self.assertEqual(_readiness_label(11), "Strong")
-        self.assertEqual(_readiness_label(4), "Strong")
-        self.assertEqual(_readiness_label(0), "Neutral")
-        self.assertEqual(_readiness_label(-11), "Weak")
-        self.assertEqual(_readiness_label(-12), "Very Weak")
+        # Seven bands over -40..40 (Jamie, 2026-10-03); both edges of every band.
+        bands = [
+            (-40, -30, "Awful"),
+            (-29, -20, "Very Weak"),
+            (-19, -10, "Weak"),
+            (-9, 9, "Neutral"),
+            (10, 19, "Strong"),
+            (20, 29, "Very Strong"),
+            (30, 40, "Elite"),
+        ]
+        for low, high, word in bands:
+            for value in range(low, high + 1):
+                self.assertEqual(_readiness_label(value), word, value)
+        self.assertEqual(sum(high - low + 1 for low, high, _ in bands), 81)
+        self.assertEqual([bars for _floor, bars, _word in READINESS_BANDS], [6, 5, 4, 3, 2, 1, 0])
+
+    def test_readiness_value_is_the_two_attributes_combined(self):
+        team = {"fb_efficiency": 12, "fb_opp_modifier": -3, "pt_efficiency": -20, "pt_opp_modifier": -20}
+        self.assertEqual(_readiness_value(team, "fb_efficiency", "fb_opp_modifier"), 9)
+        self.assertEqual(_readiness_value(team, "pt_efficiency", "pt_opp_modifier"), -40)
+        self.assertEqual(_readiness_value({}, "fb_efficiency", "fb_opp_modifier"), 0)
+        # A whole number stored as a float is still that whole number.
+        self.assertEqual(_readiness_value({"a": 7.0, "b": 4}, "a", "b"), 11)
+        self.assertIsInstance(_readiness_value({"a": 7.0, "b": 4}, "a", "b"), int)
+
+    def test_readiness_has_no_rule_for_a_fraction_or_a_value_off_the_scale(self):
+        # No writer produces one (attributes are whole numbers clamped to -20..20). If one
+        # ever appears there is no band for it: the note says so instead of guessing.
+        for team in ({"a": 4.5, "b": 5}, {"a": 0.25, "b": 0}, {"a": 30, "b": 11}, {"a": -21, "b": -20}):
+            value = _readiness_value(team, "a", "b")
+            self.assertIsNone(value, team)
+            self.assertEqual(_readiness_label(value), READINESS_UNKNOWN)
+
+    def test_readiness_sections_carry_the_word_and_the_number(self):
+        team = {"fb_efficiency": 15, "fb_opp_modifier": 16, "pt_efficiency": -12, "pt_opp_modifier": -19}
+        sections = build_structured_training_report_notes(
+            is_training_camp=False, players=[], original_player_baselines={}, team=team,
+            plays_data={}, scouting_data={}, legacy_energy_notes=[],
+        )
+        by_title = {section["title"]: section for section in sections}
+        self.assertEqual(by_title["Fast Break Readiness"], {"title": "Fast Break Readiness", "body": "Elite", "value": 31})
+        self.assertEqual(by_title["Press/Trap Readiness"], {"title": "Press/Trap Readiness", "body": "Awful", "value": -31})
 
     def test_offensive_greedy_skips_four_way_second_tier(self):
         plays = {

@@ -166,7 +166,7 @@ export const TRAINING_SHELL = `<div class="training-container resource-page-cont
           <div class="playbook-mode-selection">
             <h3 class="drill-title">Training Plays</h3>
             <p id="custom-playbook-banner" class="custom-playbook-banner" hidden>
-              Custom playbook is configured for this session (CMD gains only on selected plays).
+              Custom playbook is on: CMD gains go only to the plays you selected. It stays your default until you switch back to Current Playbooks.
             </p>
             <div class="playbook-mode-toggle" role="group" aria-label="Training plays">
               <button type="button" id="playbook-mode-current-btn" class="playbook-mode-btn is-selected" aria-pressed="true">

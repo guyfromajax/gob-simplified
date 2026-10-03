@@ -269,8 +269,8 @@ test('Office drill-in: real data, Back, no Player Training highlight', async ({ 
   await openReport(page, { from: 'office', origin: 'office' });
   await expect(page.locator('.training-report-page')).toContainText('Four Corners');
   await expect(page.locator('.training-report-page')).toContainText('Roger Henrich');
-  // Readiness is its own card now; the measure keeps its one name, "P/T Defense".
-  await expect(page.locator('.training-report-page .tr-card--readiness')).toContainText('P/T Defense');
+  // Readiness is its own card; its second row is both press/trap measures combined, "Press/Traps".
+  await expect(page.locator('.training-report-page .tr-card--readiness')).toContainText('Press/Traps');
   await expect(page.locator('#team-attributes-grid')).not.toContainText('Momentum');
   const tokenLook = await page.evaluate(() => {
     const host = document.querySelector('.training-report-page');
