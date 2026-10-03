@@ -9,7 +9,7 @@
 
 
 ##App Build
-1. Downloadable game vs Live game dynamics
+1. Build downloadable app
 2. Steam submission for review
 
 
