@@ -131,6 +131,22 @@
     });
   }
 
+  // The coach's team for an outbound link. The address carries it on some arrivals only:
+  // after a game, from the mode select and from Set Lineup the Office opens with
+  // franchise_id alone, and a standalone page (the Training Report) cannot load without a
+  // team. The command center notes the franchise's own team on GOBViews as soon as its
+  // data is in, so that is the fallback.
+  function userTeamId(current) {
+    var fromUrl = current.get('team_id') || current.get('user_team_id');
+    if (fromUrl) return fromUrl;
+    var views = global.GOBViews;
+    try {
+      return (views && typeof views.userTeamId === 'function' && views.userTeamId()) || '';
+    } catch (err) {
+      return '';
+    }
+  }
+
   function href(path, params) {
     if (!path) return '';
     var query = new URLSearchParams();
@@ -146,7 +162,7 @@
     var current = new URLSearchParams(global.location.search);
     var params = {};
     if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
-    var teamId = current.get('team_id') || current.get('user_team_id');
+    var teamId = userTeamId(current);
     if (teamId) params.team_id = teamId;
     return href(path, params);
   }
@@ -176,7 +192,7 @@
     var current = new URLSearchParams(global.location.search);
     var params = { roster_team_id: teamId, return_tab: 'home-tab' };
     if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
-    var owner = current.get('team_id') || current.get('user_team_id');
+    var owner = userTeamId(current);
     if (owner) params.team_id = owner;
     else params.team_id = teamId;
     return viewHref({
@@ -495,7 +511,7 @@
     // Standalone focus page. `from` picks Continue to Office vs Back to Locker Room.
     var params = { mode: 'franchise', from: 'office', origin: 'office' };
     if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
-    var teamId = current.get('team_id') || current.get('user_team_id');
+    var teamId = userTeamId(current);
     if (teamId) params.team_id = teamId;
     var week = digest && digest.result && digest.result.week;
     if (!present(week) && digest && digest.next_game) week = digest.next_game.week;
@@ -833,6 +849,7 @@
       var allUrl = trainingReportHref(digest);
       var all = el('a', 'lnk', 'All changes');
       all.href = allUrl;
+      all.dataset.officeLink = 'training-report';
       bindGo(all, allUrl);
       foot.appendChild(all);
       node.appendChild(foot);
@@ -1101,22 +1118,120 @@
     return node;
   }
 
-  // All season until Signing Day: the region's best recruits and who leads for each.
+  // One recruit, the same on every recruiting list of the Office: the name on top; under
+  // it position, RT and year, in that order. The right-hand column is the list's own
+  // (who he leans to, or the points the coach put on him).
+  function recruitRow(row, right, mine) {
+    var url = recruitingHref();
+    var node = el('a', 'wr sg-c rc-row' + (mine ? ' me' : ''));
+    node.href = url;
+    bindGo(node, url);
+    var body = el('span', 'wr-b');
+    var line = el('span', 'wr-1');
+    line.appendChild(el('span', 'nm', row.name));
+    body.appendChild(line);
+    var facts = el('span', 'wr-2 rc-facts');
+    if (present(row.position)) facts.appendChild(el('span', 'rc-pos', row.position));
+    var grade = rtNode(row.rt);
+    if (grade) facts.appendChild(grade);
+    if (present(row.year)) facts.appendChild(el('span', 'rc-yr', row.year));
+    if (facts.childNodes.length) body.appendChild(facts);
+    node.appendChild(body);
+    if (right) node.appendChild(right);
+    return node;
+  }
+
+  function leanCell(row) {
+    var has = present(row.lean_team_name);
+    return el('span', 'rc-lean' + (has ? '' : ' is-none'), has ? String(row.lean_team_name) : 'No lean');
+  }
+
+  // Top or Watchlist: remembered for the session (a tab's sessionStorage), Top by default.
+  var RECRUIT_LIST_KEY = 'gob-office-recruits-list';
+  function recruitListChoice() {
+    try {
+      return global.sessionStorage.getItem(RECRUIT_LIST_KEY) === 'watchlist' ? 'watchlist' : 'top';
+    } catch (err) {
+      return 'top';
+    }
+  }
+  function rememberRecruitList(which) {
+    try { global.sessionStorage.setItem(RECRUIT_LIST_KEY, which); } catch (err) { /* not remembered */ }
+  }
+
+  // All season until Signing Day. Top: the region's five best and who leads for each.
+  // Watchlist: the five best the coach is watching, from any region.
   function topRecruitsCard(top, index) {
     if (!top) return null;
-    var rows = listOf(top.rows).filter(function (row) { return present(row.name); });
-    var node = titledCard('office-list office-top', index, 'Top Recruits', present(top.region) ? 'Region ' + top.region : '');
-    if (!rows.length) {
-      node.appendChild(el('p', 'wr-empty', 'No recruits in your region yet'));
-      return node;
+    var lists = {
+      top: listOf(top.rows).filter(function (row) { return present(row.name); }),
+      watchlist: listOf(top.watchlist && top.watchlist.rows).filter(function (row) { return present(row.name); })
+    };
+    var node = card('office-list office-top', index);
+    var head = el('div', 'card-h');
+    var title = el('h3', '', 'Top Recruits');
+    head.appendChild(title);
+    // The app's segment control (.stats-toggle), right-aligned in the title row.
+    var seg = el('div', 'stats-toggle office-seg');
+    seg.setAttribute('role', 'group');
+    seg.setAttribute('aria-label', 'Recruit list');
+    var buttons = {};
+    [['top', 'Top'], ['watchlist', 'Watchlist']].forEach(function (pair) {
+      var button = el('button', '', pair[1]);
+      button.type = 'button';
+      button.dataset.value = pair[0];
+      // A choice, not a navigation: the delegated data-sfx hook gives it the select tick.
+      button.setAttribute('data-sfx', 'SFX_SELECT');
+      button.addEventListener('click', function () {
+        if (node.dataset.recruitList === pair[0]) return;
+        rememberRecruitList(pair[0]);
+        paint(pair[0]);
+      });
+      buttons[pair[0]] = button;
+      seg.appendChild(button);
+    });
+    head.appendChild(seg);
+    node.appendChild(head);
+
+    function paint(which) {
+      node.dataset.recruitList = which;
+      // The region belongs to the Top list only; the watchlist is from every region.
+      title.textContent = which === 'top' && present(top.region)
+        ? 'Top Recruits (Region ' + top.region + ')'
+        : 'Top Recruits';
+      Object.keys(buttons).forEach(function (key) {
+        buttons[key].classList.toggle('on', key === which);
+        buttons[key].setAttribute('aria-pressed', key === which ? 'true' : 'false');
+      });
+      while (head.nextSibling) node.removeChild(head.nextSibling);
+      var rows = lists[which];
+      if (!rows.length) {
+        node.appendChild(el('p', 'wr-empty', which === 'watchlist'
+          ? 'Hey Coach, add players to your watchlist'
+          : 'No recruits in your region yet'));
+        return;
+      }
+      rows.forEach(function (row) {
+        node.appendChild(recruitRow(row, leanCell(row), !!row.lean_is_user));
+      });
     }
-    var url = recruitingHref();
+
+    paint(recruitListChoice());
+    return node;
+  }
+
+  // Week 35, once the Orders list is in and until Signing Day runs: every recruit the
+  // coach put points on, most points first (the server's order).
+  function ordersCard(signing, index) {
+    if (!signing || !signing.orders_submitted) return null;
+    var rows = listOf(signing.orders).filter(function (row) { return present(row.name); });
+    if (!rows.length) return null;
+    var node = titledCard('office-list office-orders', index, 'Your Orders');
     rows.forEach(function (row) {
-      node.appendChild(personRow({
-        name: row.name, label: row.position, mine: !!row.lean_is_user, url: url,
-        detail: present(row.lean_team_name) ? 'Leans ' + row.lean_team_name : 'No lean yet',
-        right: gradeCell(row.rt)
-      }));
+      var points = el('span', 'rc-pts');
+      points.appendChild(el('b', 'tdig', String(row.points)));
+      points.appendChild(el('i', '', Number(row.points) === 1 ? 'pt' : 'pts'));
+      node.appendChild(recruitRow(row, points, false));
     });
     return node;
   }
@@ -1166,7 +1281,7 @@
     if (current.get('franchise_id') && !url.searchParams.get('franchise_id')) {
       url.searchParams.set('franchise_id', current.get('franchise_id'));
     }
-    var teamId = current.get('team_id') || current.get('user_team_id');
+    var teamId = userTeamId(current);
     if (teamId && !url.searchParams.get('team_id')) url.searchParams.set('team_id', teamId);
     return url.pathname + (url.search || '');
   }
@@ -1312,14 +1427,13 @@
     var moved = (Array.isArray(snap.moved_most) ? snap.moved_most : []).filter(function (row) {
       return row && MOVED_MOST[row.measure] === true;
     });
-    node.appendChild(el('div', 'sub-h', 'Moved most'));
+    node.appendChild(el('div', 'sub-h', 'Team Attributes Moved Most'));
     if (snap.state === 'set_after_camp' || !moved.length) {
       // One quiet line: before camp there is nothing to compare; after it, none of the
       // eight moved. Never a fallback to a measure on another scale.
-      // "No movement this week" stands alone, no trailing dash (Jamie, 2026-10-02).
+      // The line stands alone in both states: no trailing dash.
       var line = el('div', 'msr msr-empty');
       line.appendChild(el('span', '', snap.state === 'set_after_camp' ? 'Set after camp' : 'No movement this week'));
-      if (snap.state === 'set_after_camp') line.appendChild(el('b', '', '\u2014'));
       node.appendChild(line);
     } else {
       moved.slice(0, 2).forEach(function (row) {
@@ -1335,7 +1449,7 @@
     return node;
   }
 
-  function signingCard(signing, index) {
+  function signingCard(signing, index, ordersListed) {
     if (!signing) return null;
     var node = card('office-sign', index);
     var head = el('div', 'card-h');
@@ -1364,7 +1478,7 @@
       pair.appendChild(spots);
     }
     if (pair.childNodes.length) node.appendChild(pair);
-    var targets = Array.isArray(signing.targets) ? signing.targets : [];
+    var targets = (!ordersListed && Array.isArray(signing.targets)) ? signing.targets : [];
     if (targets.length) node.appendChild(el('div', 'sub-h', 'Targets'));
     targets.forEach(function (target) {
       if (!target || !present(target.name)) return;
@@ -1439,7 +1553,7 @@
     var current = new URLSearchParams(global.location.search);
     var params = { tab: 'standings-view' };
     if (current.get('franchise_id')) params.franchise_id = current.get('franchise_id');
-    var teamId = current.get('team_id') || current.get('user_team_id');
+    var teamId = userTeamId(current);
     if (teamId) params.team_id = teamId;
     return href('/franchise-command-center.html', params);
   }
@@ -1619,7 +1733,10 @@
         snapshotCard(digest.team_snapshot, 3),
         standingsCard(digest.conference_standings, 4)
       ];
-      third = [signingCard(digest.signing_day, 5)];
+      // Orders submitted: the list of everyone with points sits under the Signing Day
+      // card, which then drops its own three "Targets" (the list is all of them).
+      var orders = ordersCard(digest.signing_day, 6);
+      third = [signingCard(digest.signing_day, 5, !!orders), orders];
     } else {
       first = [sinceLastWeekCard(digest, 1, countScores, userRank)];
       second = [

@@ -190,7 +190,9 @@ for (const w of [1280, 1920]) {
 
 test('#10 roster toggle spacing', async ({ page }) => {
   await open(page, ctx.fcc('roster-view'), 1280, '.stats-toggle button em');
-  const m = await page.evaluate(() => Array.from(document.querySelectorAll('.stats-toggle button')).map((b) => {
+  // Only the toggles that carry a count: the Office's Top / Watchlist segment is the same
+  // control with no count, and it is in the document behind this view.
+  const m = await page.evaluate(() => Array.from(document.querySelectorAll('.stats-toggle button')).filter((b) => b.querySelector('em')).map((b) => {
     const em = b.querySelector('em');
     const range = document.createRange();
     range.selectNodeContents(b.firstChild);
@@ -199,6 +201,7 @@ test('#10 roster toggle spacing', async ({ page }) => {
   metrics.rosterToggle = m;
   await shot(page, 'roster', 1280);
   if (BEFORE) return;
+  expect(m.length, 'the roster has its two counted toggles').toBeGreaterThanOrEqual(2);
   for (const b of m) expect(b.gap, `space between label and count: ${b.label}`).toBeGreaterThanOrEqual(5);
 });
 
@@ -222,7 +225,8 @@ test('#10/#6 awards: the week-1 preseason projection, not an empty card', async 
   const view = page.locator('#awards-view');
   const m = await view.evaluate((host) => {
     const shown = (el) => !!el.offsetParent;
-    const tables = Array.from(host.querySelectorAll('table.gob-awards-tbl')).filter(shown);
+    // The All-American teams only: the All-Conference tables (.gob-awards-conf) sit below them.
+    const tables = Array.from(host.querySelectorAll('.gob-awards > section table.gob-awards-tbl')).filter(shown);
     return {
       empties: Array.from(host.querySelectorAll('.gob-empty')).filter(shown).length,
       heading: (host.querySelector('.gob-awards-head h2') || {}).textContent || '',

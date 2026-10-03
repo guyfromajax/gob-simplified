@@ -189,13 +189,35 @@ function topRecruitsBlock(overrides) {
   return Object.assign({
     region: 'A',
     rows: [
-      { recruit_id: 'r10', name: 'Darius Kemp', position: 'C', rt: 92, lean_team_id: 'team-0', lean_team_name: 'Alpha', lean_is_user: false },
-      { recruit_id: 'r11', name: 'Miles Hart', position: 'SG', rt: 88, lean_team_id: TID, lean_team_name: 'Amariabi International', lean_is_user: true },
-      { recruit_id: 'r12', name: 'Owen Blake', position: 'PF', rt: 81, lean_team_id: 'team-1', lean_team_name: 'Crickstown', lean_is_user: false },
-      { recruit_id: 'r13', name: 'Jon Abara', position: 'PG', rt: 74, lean_team_id: null, lean_team_name: null, lean_is_user: false },
-      { recruit_id: 'r14', name: 'Luka Fenn', position: 'SF', rt: 69, lean_team_id: 'team-2', lean_team_name: 'Gamma', lean_is_user: false },
+      { recruit_id: 'r10', name: 'Darius Kemp', position: 'C', rt: 92, year: 'SR', lean_team_id: 'team-0', lean_team_name: 'Alpha', lean_is_user: false },
+      { recruit_id: 'r11', name: 'Miles Hart', position: 'SG', rt: 88, year: 'SR', lean_team_id: TID, lean_team_name: 'Amariabi International', lean_is_user: true },
+      { recruit_id: 'r12', name: 'Owen Blake', position: 'PF', rt: 81, year: 'JR', lean_team_id: 'team-1', lean_team_name: 'Crickstown', lean_is_user: false },
+      { recruit_id: 'r13', name: 'Jon Abara', position: 'PG', rt: 74, year: 'SR', lean_team_id: null, lean_team_name: null, lean_is_user: false },
+      { recruit_id: 'r14', name: 'Luka Fenn', position: 'SF', rt: 69, year: 'SO', lean_team_id: 'team-2', lean_team_name: 'Gamma', lean_is_user: false },
     ],
+    // The coach's watchlist: the five best of seven watched, from any region.
+    watchlist: {
+      count: 7,
+      rows: [
+        { recruit_id: 'w1', name: 'Tobias Okonkwo-Reyes', position: 'PF', rt: 95, year: 'SR', lean_team_id: 'team-9', lean_team_name: 'Long Island Methodist', lean_is_user: false },
+        { recruit_id: 'r11', name: 'Miles Hart', position: 'SG', rt: 88, year: 'SR', lean_team_id: TID, lean_team_name: 'Amariabi International', lean_is_user: true },
+        { recruit_id: 'w3', name: 'Enzo Varga', position: 'PG', rt: 84, year: 'JR', lean_team_id: 'team-7', lean_team_name: 'Chapel Hill', lean_is_user: false },
+        { recruit_id: 'w4', name: 'Sol Whitaker', position: 'C', rt: 77, year: 'SR', lean_team_id: null, lean_team_name: null, lean_is_user: false },
+        { recruit_id: 'w5', name: 'Kofi Brandt', position: 'SF', rt: 70, year: 'FR', lean_team_id: 'team-3', lean_team_name: 'Delta', lean_is_user: false },
+      ],
+    },
   }, overrides || {});
+}
+
+/** Week 35 once the Orders list is in: every recruit with points, most points first. */
+function submittedOrders() {
+  return [
+    { recruit_id: 'r1', name: 'Miles Hart', position: 'SG', rt: 'A', year: 'SR', points: 18 },
+    { recruit_id: 'r2', name: 'Owen Blake', position: 'PF', rt: 'B+', year: 'JR', points: 12 },
+    { recruit_id: 'r3', name: 'Tobias Okonkwo-Reyes', position: 'PF', rt: 'A+', year: 'SR', points: 5 },
+    { recruit_id: 'r4', name: 'Sol Whitaker', position: 'C', rt: 'B', year: 'SR', points: 2 },
+    { recruit_id: 'r5', name: 'Kofi Brandt', position: 'SF', rt: 'C+', year: 'FR', points: 1 },
+  ];
 }
 
 function digest(state, patch) {
@@ -447,4 +469,4 @@ async function openOffice(page, data) {
   });
 }
 
-module.exports = { FID, TID, STATES, digest, commandCenter, resultBlock, nextBlock, wireBlock, snapshotBlock, standingsBlock, previewBlock, topRecruitsBlock, installApi, openOffice, fulfillJson };
+module.exports = { FID, TID, STATES, digest, commandCenter, resultBlock, nextBlock, wireBlock, snapshotBlock, standingsBlock, previewBlock, topRecruitsBlock, submittedOrders, installApi, openOffice, fulfillJson };

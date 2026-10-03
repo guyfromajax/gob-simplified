@@ -336,6 +336,52 @@ def test_preseason_first_week_and_signing_day_states():
     assert signing["signing_day"]["targets"][0]["recruit_id"] == "r1"
     assert signing["signing_day"]["targets"][0]["stars"] is None
     assert signing["season_preview"] is None
+    # Not submitted: no Orders list on the Office.
+    assert signing["signing_day"]["orders_submitted"] is False
+    assert signing["signing_day"]["orders"] is None
+
+
+def test_submitted_orders_list_every_recruit_with_points_most_points_first():
+    lookup = {
+        "r1": {"name": "Abe Low", "position": "PG", "rt": "B", "lean_rank": 1, "year": "SR"},
+        "r2": {"name": "Ben High", "position": "C", "rt": "A", "lean_rank": None, "year": "JR"},
+        "r3": {"name": "Cy Tie", "position": "SF", "rt": "C+", "lean_rank": 2, "year": None},
+        "r4": {"name": "Dee Zero", "position": "SG", "rt": "C", "lean_rank": None, "year": "SR"},
+    }
+    ctx = dict(
+        week=35,
+        signing_orders={
+            "1": {"id": "r1", "points": 10, "playing_time": True},
+            "2": {"id": "r2", "points": 25, "playing_time": False},
+            "3": {"id": "r3", "points": 10, "playing_time": False},
+            "4": {"id": "r4", "points": 0, "playing_time": False},
+            "5": {"id": "r9", "points": 5},
+        },
+        signing_points_total=50,
+        roster_spots=2,
+        recruit_lookup=lookup,
+        last_game=None,
+    )
+    digest = build_office_digest(_ctx(advance_flags={"week": 35, "week_35_orders_submitted": True}, **ctx))
+    signing = digest["signing_day"]
+    assert signing["orders_submitted"] is True
+    # Most points first; equal points keep the order of the list; zero points is not listed.
+    assert [(row["recruit_id"], row["points"]) for row in signing["orders"]] == [
+        ("r2", 25), ("r1", 10), ("r3", 10), ("r9", 5),
+    ]
+    assert signing["orders"][0] == {
+        "recruit_id": "r2", "name": "Ben High", "position": "C", "rt": "A", "year": "JR", "points": 25,
+    }
+    # A recruit the lookup does not know still has his row (the client skips a nameless one).
+    assert signing["orders"][3]["name"] is None
+    # The card above is unchanged.
+    assert signing["points_remaining"] == 0 and signing["open_roster_spots"] == 2
+    # The coach's own points only: no score, multiplier or odds.
+    for row in signing["orders"]:
+        assert set(row) == {"recruit_id", "name", "position", "rt", "year", "points"}
+    # Before the list is submitted the same orders are not listed.
+    draft = build_office_digest(_ctx(advance_flags={"week": 35, "week_35_orders_submitted": False}, **ctx))
+    assert draft["signing_day"]["orders"] is None
 
 
 def test_result_win_uses_potg_and_loss_uses_team_leader():

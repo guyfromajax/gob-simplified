@@ -156,7 +156,7 @@ test('week 1, season 1: every section, in order, with its content', async ({ pag
     { heading: 'Season Preview', cards: ['Rankings', 'Key Players', 'Preseason All-Americans'] },
     // No Team snapshot in week 1: before camp it could only say "Set after camp".
     { heading: 'Opening Week', cards: ['(game)', 'Circle these', 'Preseason National Rankings'] },
-    { heading: 'Recruiting', cards: ['(wire)', 'Walk-ons', 'Top Recruits'] },
+    { heading: 'Recruiting', cards: ['(wire)', 'Walk-ons', 'Top Recruits (Region A)'] },
   ]);
 
   // No "Picked Nth of 8" card (removed 2026-10-02): Rankings says the conference place.
@@ -261,14 +261,16 @@ test('week 1, season 1: every section, in order, with its content', async ({ pag
   ]);
   const top = await rowsOf(page, '#office-root .office-top');
   expect(top.map((row) => row.cells)).toEqual([
-    ['Darius Kemp C Leans Alpha', 'A+'],
-    ['Miles Hart SG Leans Amariabi International', 'A'],
-    ['Owen Blake PF Leans Crickstown', 'A'],
-    ['Jon Abara PG No lean yet', 'B+'],
-    ['Luka Fenn SF Leans Gamma', 'B'],
+    // The name; under it position, RT, year; the lean on the right (v3-office.spec.js).
+    ['Darius Kemp C A+ SR', 'Alpha'],
+    ['Miles Hart SG A SR', 'Amariabi International'],
+    ['Owen Blake PF A JR', 'Crickstown'],
+    ['Jon Abara PG B+ SR', 'No lean'],
+    ['Luka Fenn SF B SO', 'Gamma'],
   ]);
   expect(top.map((row) => row.mine)).toEqual([false, true, false, false, false]);
-  await expect(page.locator('#office-root .office-top .card-h .meta')).toHaveText('Region A');
+  await expect(page.locator('#office-root .office-top .card-h h3')).toHaveText('Top Recruits (Region A)');
+  await expect(page.locator('#office-root .office-top .card-h .meta')).toHaveCount(0);
 
   // Five rows or fewer per section (the conference table is its eight teams).
   const counts = await page.evaluate(() => [...document.querySelectorAll('#office-root .card')].map((card) => ({
@@ -347,7 +349,7 @@ test('week 2: the normal Office, plus Top Recruits', async ({ page }) => {
   expect(await layout(page)).toEqual([
     { heading: 'Since last week', cards: ['(card wkc ar-card)'] },
     { heading: 'This Week', cards: ['(game)', 'Team snapshot', 'Conference A2 standings'] },
-    { heading: 'Recruiting', cards: ['(wire)', 'Top Recruits'] },
+    { heading: 'Recruiting', cards: ['(wire)', 'Top Recruits (Region A)'] },
   ].map((col, i) => (i === 0 ? { heading: col.heading, cards: (expect.any(Array)) } : col)));
   // No week-1 section survives into week 2.
   for (const selector of ['.office-outlook', '.office-ranks', '.office-kp', '.office-new', '.office-aa', '.office-circle', '.office-pre', '.office-walk', '.nx-open']) {
