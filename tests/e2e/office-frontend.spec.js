@@ -1283,7 +1283,7 @@ test('recruiting keeps the latest event and whole rows', async ({ page }) => {
   expect(rows).not.toContain('id:r0');
   expect(rows).toContain('id:r1');
   await expect(page.locator('#office-root .office-wire')).toContainText('Latest for 1');
-  expect(rows.length).toBeLessThanOrEqual(8);
+  expect(rows.length).toBeLessThanOrEqual(5);
   expect(rows.length).toBeGreaterThan(0);
   await assertWireRows(page);
   const cut = await page.evaluate(() => {
@@ -1296,7 +1296,7 @@ test('recruiting keeps the latest event and whole rows', async ({ page }) => {
   expect(cut).toBe(0);
   await page.setViewportSize({ width: 1920, height: 1080 });
   await openOffice(page, data);
-  expect(await page.locator('#office-root .office-wire .wr').count()).toBeLessThanOrEqual(12);
+  expect(await page.locator('#office-root .office-wire .wr').count()).toBeLessThanOrEqual(8);
   const empty = commandCenter(digest('regular', {
     recruiting_wire: wireBlock({ events: [], status: 'No recruiting movement', pending_count: 0, urgent: false }),
   }));

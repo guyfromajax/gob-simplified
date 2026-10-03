@@ -909,7 +909,7 @@
   }
 
   function recruitCap() {
-    return largeDensity() ? 12 : 8;
+    return largeDensity() ? 8 : 5;
   }
 
   function wireCard(wire, oneLine, index) {
